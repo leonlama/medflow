@@ -1,0 +1,17 @@
+# Node
+node_modules/
+dist/
+.env
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# AWS CDK
+cdk.out/
+
+# OS
+.DS_Store
+Thumbs.db

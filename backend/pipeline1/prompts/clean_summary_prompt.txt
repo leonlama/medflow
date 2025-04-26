@@ -1,0 +1,15 @@
+Extract the following fields from the form text:
+
+- patient_name
+- patient_id (if any)
+- date_of_birth
+- symptoms
+- diagnosis
+- insurance_info
+- address
+- contact_info
+
+Return a valid JSON structure.
+
+Form text:
+{{form_text}}

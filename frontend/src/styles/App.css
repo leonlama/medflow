@@ -1,0 +1,19 @@
+/* src/styles/App.css */
+.app-container {
+  padding: 2rem;
+}
+
+.navbar {
+  margin-bottom: 2rem;
+}
+
+.navbar a {
+  margin-right: 1rem;
+  text-decoration: none;
+  color: black;
+  font-weight: bold;
+}
+
+.navbar a.active {
+  color: blue;
+}

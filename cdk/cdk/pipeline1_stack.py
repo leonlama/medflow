@@ -44,25 +44,17 @@ class Pipeline1Stack(Stack):
         # Explicitly limit access to just our SNS topic (optional but best practice)
         textract_topic.grant_publish(textract_service_role)
 
-        # Lambda: Upload Handler
-        upload_handler = _lambda.Function(
-            self, "UploadHandler",
-            runtime=_lambda.Runtime.PYTHON_3_9,
-            handler="pipeline1.handlers.upload_handler.lambda_handler",
-            code=_lambda.Code.from_asset("../backend"),
-            timeout=Duration.seconds(30),
-            log_retention=logs.RetentionDays.ONE_DAY,
+        # Lambda: Clean Handler
+        self.clean_handler = _lambda.Function(
+            self, "CleanHandler",
+            runtime=_lambda.Runtime.PYTHON_3_11,
+            handler="clean_handler.lambda_handler",
+            code=_lambda.Code.from_asset("lambda"),
             environment={
-                "UPLOAD_BUCKET": uploads_bucket.bucket_name,
-                "PATIENT_TABLE": patient_table.table_name,
-                "SNS_TOPIC_ARN": textract_topic.topic_arn,
-                "TEXTRACT_ROLE_ARN": textract_service_role.role_arn  # Updated
+                "BUCKET_NAME": uploads_bucket.bucket_name,
+                "TABLE_NAME": patient_table.table_name,
+                "TEXTRACT_ROLE_ARN": textract_service_role.role_arn,
             }
-        )
-
-        # Assign AWSLambdaBasicExecutionRole to Upload Handler
-        upload_handler.role.add_managed_policy(
-            iam.ManagedPolicy.from_aws_managed_policy_name('service-role/AWSLambdaBasicExecutionRole')
         )
 
         # Lambda: Textract Completion Handler
@@ -105,22 +97,11 @@ class Pipeline1Stack(Stack):
         )
 
         # Permissions
-        uploads_bucket.grant_read_write(upload_handler)
-        patient_table.grant_read_write_data(upload_handler)
+        uploads_bucket.grant_read_write(self.clean_handler)
+        patient_table.grant_read_write_data(self.clean_handler)
         patient_table.grant_read_write_data(textract_complete_handler)
         patient_table.grant_read_data(search_patients_handler)
-        textract_topic.grant_publish(upload_handler)
         textract_topic.add_subscription(subs.LambdaSubscription(textract_complete_handler))
-
-        upload_handler.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "textract:StartDocumentTextDetection",
-                    "textract:StartDocumentAnalysis"  # <-- NEW
-                ],
-                resources=["*"]
-            )
-        )
 
         # API Gateway setup
         api = apigw.RestApi(
@@ -134,24 +115,13 @@ class Pipeline1Stack(Stack):
             )
         )
 
-        clean = api.root.add_resource("clean")
-        clean.add_method(
+        api.root.add_resource("clean").add_method(
             "POST",
-            apigw.LambdaIntegration(upload_handler),
-            method_responses=[
-                apigw.MethodResponse(
-                    status_code="200",
-                    response_parameters={
-                        "method.response.header.Access-Control-Allow-Origin": True,
-                        "method.response.header.Access-Control-Allow-Methods": True,
-                        "method.response.header.Access-Control-Allow-Headers": True,
-                    },
-                )
-            ],
+            apigw.LambdaIntegration(self.clean_handler)
         )
 
         health = api.root.add_resource("health")
-        health.add_method("GET", apigw.LambdaIntegration(upload_handler))
+        health.add_method("GET", apigw.LambdaIntegration(self.clean_handler))
 
         # API Gateway: /patients GET
         patients = api.root.add_resource("patients")

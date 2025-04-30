@@ -27,7 +27,7 @@ def lambda_handler(event, context):
 
         patient_id = patient['patient_id']
         response = textract.get_document_analysis(JobId=job_id)
-        extracted_fields = extract_fields(response)
+        extracted_fields = extract_fields(response, message)
 
         logger.info(f"Extracted fields for patient {patient_id}: {extracted_fields}")
 
@@ -45,7 +45,7 @@ def find_patient_by_job_id(job_id):
     items = response.get('Items', [])
     return items[0] if items else None
 
-def extract_fields(textract_response):
+def extract_fields(textract_response, message):
     fields = {
         "name": "",
         "birthday": "",
@@ -92,7 +92,8 @@ def extract_fields(textract_response):
             elif 'emergency contact phone' in normalized_key:
                 fields['emergency_contact_phone'] = value_text
 
-    fields["status"] = "ready"
+    fields["status"] = "pending_confirmation"
+    fields["pdf_url"] = f"https://{os.environ['S3_BUCKET']}.s3.amazonaws.com/{message['S3ObjectKey']}"
     return fields
 
 def get_text(block, blocks):
